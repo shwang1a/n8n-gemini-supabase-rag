@@ -1,0 +1,63 @@
+{
+  "name": "01A_google_drive_index",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Google Drive Trigger",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "position": [
+        200,
+        200
+      ],
+      "parameters": {
+        "triggerOn": "fileCreated"
+      }
+    },
+    {
+      "id": "2",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        500,
+        200
+      ],
+      "parameters": {
+        "operation": "download"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Extract From File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        800,
+        200
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Extract From File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
