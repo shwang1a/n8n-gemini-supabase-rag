@@ -1,0 +1,161 @@
+{
+  "name": "01 - Document Import (Gemini + Supabase RAG)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "filePath": "/files/input.txt"
+      },
+      "id": "read_file",
+      "name": "Read File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const buffer = Buffer.from(items[0].binary.data.data, 'base64');\nconst text = buffer.toString('utf8');\n\nreturn [{ json: { text } }];"
+      },
+      "id": "to_text",
+      "name": "Binary to Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.text;\nconst chunkSize = 1000;\nconst overlap = 150;\n\nlet chunks = [];\nlet i = 0;\n\nwhile (i < text.length) {\n  const chunk = text.slice(i, i + chunkSize);\n  chunks.push({ chunk });\n  i += (chunkSize - overlap);\n}\n\nreturn chunks.map(c => ({ json: c }));"
+      },
+      "id": "chunking",
+      "name": "Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "batch",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "key",
+              "value": "={{$env.GEMINI_API_KEY}}"
+            }
+          ]
+        },
+        "bodyParametersJson": "={\n  \"content\": {\n    \"parts\": [\n      {\n        \"text\": $json.chunk\n      }\n    ]\n  }\n}"
+      },
+      "id": "embedding",
+      "name": "Gemini Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:54321/rest/v1/documents",
+        "method": "POST",
+        "jsonParameters": true,
+        "headers": {
+          "apikey": "={{$env.SUPABASE_KEY}}",
+          "Authorization": "Bearer {{$env.SUPABASE_KEY}}",
+          "Content-Type": "application/json"
+        },
+        "bodyParametersJson": "={\n  \"content\": $node[\"Chunk Text\"].json.chunk,\n  \"embedding\": $json.embedding.values[0],\n  \"metadata\": {\n    \"source\": \"local_file\",\n    \"type\": \"txt\"\n  }\n}"
+      },
+      "id": "supabase_insert",
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read File": {
+      "main": [
+        [
+          {
+            "node": "Binary to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binary to Text": {
+      "main": [
+        [
+          {
+            "node": "Chunk Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chunk Text": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Gemini Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Embedding": {
+      "main": [
+        [
+          {
+            "node": "Insert to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
