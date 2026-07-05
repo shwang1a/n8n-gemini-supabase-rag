@@ -1,0 +1,86 @@
+{
+  "name": "03 - Delete Document (Supabase RAG)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "delete-document",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const filename = $json.body.filename;\n\nif (!filename) {\n  throw new Error('filename is required');\n}\n\nreturn [{ json: { filename } }];"
+      },
+      "id": "extract",
+      "name": "Extract Filename",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:54321/rest/v1/documents?filename=eq.{{$json.filename}}",
+        "method": "DELETE",
+        "headers": {
+          "apikey": "={{$env.SUPABASE_KEY}}",
+          "Authorization": "Bearer {{$env.SUPABASE_KEY}}"
+        }
+      },
+      "id": "delete",
+      "name": "Delete from Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "responseBody": "={\n  \"status\": \"deleted\",\n  \"filename\": $node['Extract Filename'].json.filename\n}"
+      },
+      "id": "response",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Filename": {
+      "main": [
+        [
+          {
+            "node": "Delete from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
